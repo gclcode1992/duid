@@ -1,0 +1,20 @@
+# 开发环境：本地 mvn spring-boot:run / IDE 启动（默认 profile）
+# 日志：logback-spring.xml → d:/worker/duid/duid-server.<hostname>.log
+server:
+  port: ${SERVER_PORT:18086}
+
+logging:
+  file:
+    path: d:/worker/duid
+
+duid:
+  redis:
+    mode: ${DUID_REDIS_MODE:single}
+    address: ${DUID_REDIS_ADDRESS:redis://127.0.0.1:6379}
+    password: ${DUID_REDIS_PASSWORD:rds123456}
+    database: 0
+    node-addresses: []
+
+  warmup:
+    generator-iterations: 64
+    http-iterations: 8

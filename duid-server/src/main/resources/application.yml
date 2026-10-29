@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: duid-server
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+# 文件日志路径按 profile 在 logback-spring.xml 中固定：
+#   dev  → d:/worker/duid/duid-server.<hostname>.log
+#   prod → /home/worker/duid/duid-server.<hostname>.log
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+duid:
+  epoch: "2024-01-01T00:00:00Z"
+
+  id-layout:
+    # 约束：timestamp-bits + worker-bits + sequence-bits + rollback-bits + 1(符号位) == 64
+    # 符号位固定占 1 bit 且恒为 0，不可配置。
+    # 各位之和必须恰好等于 63（加上符号位共 64 bit），否则服务启动失败。
+    # 若总位数不足 64，优先增大 timestamp-bits 补齐（不影响副本数与序列容量）。
+    #
+    # timestamp-bits：相对 epoch 的毫秒差，建议 41（约 69 年）。
+    # worker-bits：Redis 租约槽位数 = 2^worker-bits，决定最大并发副本数。
+    # sequence-bits：单实例单毫秒最大发号数 = 2^sequence-bits。
+    # rollback-bits：时钟回拨代际档位数 = 2^rollback-bits；可区分回拨次数为 2^n - 1。
+    #
+    # 默认方案4（6+13+3）：64 副本、8192/ms、回拨 7 次。
+    # 备选：方案1 8+12+2 | 方案2 7+13+2 | 方案3 7+12+3
+    timestamp-bits: 41
+    worker-bits: 6
+    sequence-bits: 13
+    rollback-bits: 3
+
+  worker:
+    lease-ttl-seconds: 30
+    heartbeat-interval-seconds: 10
+
+  watermark:
+    flush-interval-ms: 1000
+
+  warmup:
+    enabled: true

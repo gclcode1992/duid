@@ -1,0 +1,20 @@
+# 生产环境：Docker 单/多副本部署（compose 注入 SPRING_PROFILES_ACTIVE=prod）
+# 日志：logback-spring.xml → /home/worker/duid/duid-server.<hostname>.log
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  file:
+    path: /home/worker/duid
+
+duid:
+  redis:
+    mode: ${DUID_REDIS_MODE:single}
+    address: ${DUID_REDIS_ADDRESS:redis://redis:6379}
+    password: ${DUID_REDIS_PASSWORD:}
+    database: 0
+    node-addresses: []
+
+  warmup:
+    generator-iterations: 32
+    http-iterations: 4

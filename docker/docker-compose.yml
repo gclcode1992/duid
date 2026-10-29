@@ -1,0 +1,51 @@
+# 单副本部署（Docker）
+# profile=prod；接入已有外部网络 app-net001（与 Redis 同网）
+# 用法（在仓库根目录）：docker compose -f docker/docker-compose.yml --env-file .env up -d
+name: duid
+
+networks:
+  app-net001:
+    external: true
+
+services:
+  duid-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        APP_VERSION: ${DUID_IMAGE_TAG:-1.0.0}
+        BASE_IMAGE: ${DUID_BASE_IMAGE:-eclipse-temurin:21-jre-alpine}
+      # 本地已打好的 Jar，不强制每次拉基础镜像；需要更新基础镜像时用 docker/docker-build.bat 或 --pull
+      pull: false
+    image: duid-server:${DUID_IMAGE_TAG:-1.0.0}
+    pull_policy: never
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "18086"
+      JAVA_OPTS: ${DUID_SERVER_JAVA_OPTS:--Xms32m -Xmx128m -XX:+UseSerialGC -XX:MaxMetaspaceSize=64m}
+      LOGGING_FILE_PATH: /home/worker/duid
+      DUID_REDIS_MODE: single
+      DUID_REDIS_ADDRESS: ${DUID_REDIS_ADDRESS:?请在 .env 中设置 DUID_REDIS_ADDRESS，例如 redis://redis-local2:6379}
+      DUID_REDIS_PASSWORD: ${DUID_REDIS_PASSWORD:-}
+    volumes:
+      # 宿主机日志目录 ←→ 容器内 logging.file.path
+      - ${DUID_LOG_HOST_DIR:-/home/worker/duid}:/home/worker/duid
+    networks:
+      - app-net001
+    ports:
+      - "18086:18086"
+    mem_limit: ${DUID_SERVER_MEM_LIMIT:-192m}
+    memswap_limit: ${DUID_SERVER_MEM_LIMIT:-192m}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18086/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "2"

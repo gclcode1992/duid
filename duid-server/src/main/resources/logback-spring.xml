@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DUID 日志配置：
+  - 控制台：stdout
+  - 文件（按 profile 固定目录，文件名含 hostname）：
+      · prod → /home/worker/duid/duid-server.<hostname>.log
+      · dev  → d:/worker/duid/duid-server.<hostname>.log
+-->
+<configuration scan="false">
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="duid-server"/>
+    <!-- Docker / 本机 hostname；取不到时用 local -->
+    <property name="INSTANCE_ID" value="${HOSTNAME:-local}"/>
+
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n"/>
+    <property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ========== 第三方嘈杂日志压制 ========== -->
+    <logger name="org.redisson" level="WARN"/>
+    <logger name="org.redisson.connection" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.lettuce" level="WARN"/>
+    <logger name="org.apache.catalina" level="WARN"/>
+    <logger name="org.apache.coyote" level="WARN"/>
+    <logger name="org.apache.tomcat" level="WARN"/>
+    <logger name="org.apache.tomcat.util.http.parser.Cookie" level="ERROR"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.springframework.web" level="WARN"/>
+    <logger name="org.springframework.boot.autoconfigure" level="WARN"/>
+    <logger name="org.springframework.boot.actuate" level="WARN"/>
+    <logger name="org.hibernate.validator" level="WARN"/>
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+
+    <!-- ========== Profile：开发 → d:/worker/duid/duid-server.<hostname>.log ========== -->
+    <springProfile name="dev">
+        <property name="LOG_PATH" value="d:/worker/duid"/>
+
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOG_PATH}/${APP_NAME}.${INSTANCE_ID}.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOG_PATH}/${APP_NAME}.${INSTANCE_ID}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxFileSize>50MB</maxFileSize>
+                <maxHistory>14</maxHistory>
+                <totalSizeCap>512MB</totalSizeCap>
+            </rollingPolicy>
+            <encoder>
+                <pattern>${FILE_LOG_PATTERN}</pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+
+        <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+            <queueSize>512</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <neverBlock>true</neverBlock>
+            <appender-ref ref="FILE"/>
+        </appender>
+
+        <logger name="com.duid" level="DEBUG"/>
+        <logger name="org.springframework.boot" level="INFO"/>
+        <logger name="org.springframework.boot.web.embedded.tomcat" level="INFO"/>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- ========== Profile：生产 → /home/worker/duid/duid-server.<hostname>.log ========== -->
+    <springProfile name="prod">
+        <property name="LOG_PATH" value="/home/worker/duid"/>
+
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOG_PATH}/${APP_NAME}.${INSTANCE_ID}.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOG_PATH}/${APP_NAME}.${INSTANCE_ID}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxFileSize>50MB</maxFileSize>
+                <maxHistory>14</maxHistory>
+                <totalSizeCap>512MB</totalSizeCap>
+            </rollingPolicy>
+            <encoder>
+                <pattern>${FILE_LOG_PATTERN}</pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+
+        <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+            <queueSize>512</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <neverBlock>true</neverBlock>
+            <appender-ref ref="FILE"/>
+        </appender>
+
+        <logger name="com.duid" level="INFO"/>
+        <logger name="org.springframework.boot" level="WARN"/>
+        <logger name="org.springframework.boot.web.embedded.tomcat" level="INFO"/>
+
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- ========== 非 dev/prod：仅控制台 ========== -->
+    <springProfile name="!dev &amp; !prod">
+        <logger name="com.duid" level="INFO"/>
+        <logger name="org.springframework.boot" level="INFO"/>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>

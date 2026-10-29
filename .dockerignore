@@ -1,0 +1,43 @@
+# Git / IDE
+.git/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+.DS_Store
+
+# 文档与本地杂项（不进构建上下文；上下文为仓库根目录）
+docs/
+*.md
+!.dockerignore
+.env
+.env.*
+!.env.example
+*.bat
+*.log
+logs/
+agent-transcripts/
+
+# Compose / 辅助文件（运行期不需要进 context；保留 entrypoint）
+docker/docker-compose*.yml
+docker/Dockerfile.maven
+docker/nginx.conf
+docker/*.bat
+
+# 忽略各模块源码与 target，只保留 server 可执行 Jar
+**/src/
+**/target/
+!duid-server/
+!duid-server/target/
+!duid-server/target/*.jar
+
+# 排除非可执行附属文件
+duid-server/target/*.jar.original
+duid-server/target/*-sources.jar
+duid-server/target/*-javadoc.jar
+duid-server/target/classes/
+duid-server/target/generated-sources/
+duid-server/target/maven-*/
+duid-server/target/test-classes/

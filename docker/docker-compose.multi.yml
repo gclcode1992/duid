@@ -1,0 +1,76 @@
+# 多副本部署（生产）：3 实例 + Nginx，接入已有外部网络 app-net001
+# profile=prod，内存可在 .env 中配置
+# 用法（在仓库根目录）：docker compose -f docker/docker-compose.multi.yml --env-file .env up -d --scale duid-server=3
+name: duid-multi
+
+networks:
+  app-net001:
+    external: true
+
+services:
+  duid-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        APP_VERSION: ${DUID_IMAGE_TAG:-1.0.0}
+        BASE_IMAGE: ${DUID_BASE_IMAGE:-eclipse-temurin:21-jre-alpine}
+      pull: false
+    image: duid-server:${DUID_IMAGE_TAG:-1.0.0}
+    pull_policy: never
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "8080"
+      JAVA_OPTS: ${DUID_SERVER_JAVA_OPTS:--Xms64m -Xmx192m -XX:+UseSerialGC -XX:MaxMetaspaceSize=96m}
+      LOGGING_FILE_PATH: /home/worker/duid
+      DUID_REDIS_MODE: single
+      DUID_REDIS_ADDRESS: ${DUID_REDIS_ADDRESS:?请在 .env 中设置 DUID_REDIS_ADDRESS，例如 redis://redis-local2:6379}
+      DUID_REDIS_PASSWORD: ${DUID_REDIS_PASSWORD:-}
+    volumes:
+      - ${DUID_LOG_HOST_DIR:-/home/worker/duid}:/home/worker/duid
+    networks:
+      - app-net001
+    expose:
+      - "8080"
+    mem_limit: ${DUID_SERVER_MEM_LIMIT:-256m}
+    memswap_limit: ${DUID_SERVER_MEM_LIMIT:-256m}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  duid-lb:
+    image: nginx:1.27-alpine
+    container_name: duid-lb
+    restart: unless-stopped
+    ports:
+      - "18086:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - app-net001
+    depends_on:
+      duid-server:
+        condition: service_healthy
+    mem_limit: ${DUID_LB_MEM_LIMIT:-64m}
+    memswap_limit: ${DUID_LB_MEM_LIMIT:-64m}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

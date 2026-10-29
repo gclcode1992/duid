@@ -1,0 +1,37 @@
+# 完整构建：在 Docker 内执行 Maven（依赖多、网络慢时不推荐）
+# 使用：docker compose -f docker/docker-compose.yml build --build-arg USE_MAVEN=1
+# 或：docker build -f docker/Dockerfile.maven -t duid-server:1.0.0 .
+# 构建上下文为仓库根目录
+# syntax=docker/dockerfile:1
+
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /build
+COPY pom.xml .
+COPY duid-common/pom.xml duid-common/
+COPY duid-spi/pom.xml duid-spi/
+COPY duid-server/pom.xml duid-server/
+COPY duid-common/src duid-common/src
+COPY duid-spi/src duid-spi/src
+COPY duid-server/src duid-server/src
+RUN mvn -q -DskipTests package -pl duid-server -am
+
+FROM eclipse-temurin:21-jre-jammy
+
+ENV TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    SERVER_PORT=8080
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /build/duid-server/target/duid-server-*.jar app.jar
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
+  CMD curl -fsS http://127.0.0.1:${SERVER_PORT}/ready || exit 1
+
+ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=${SERVER_PORT}"]
